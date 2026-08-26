@@ -1,0 +1,14 @@
+# Environment variables / secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Vector database (regenerate with ingest.py, don't need to commit it)
+vectorstore/
+
+# OS files
+.DS_Store
