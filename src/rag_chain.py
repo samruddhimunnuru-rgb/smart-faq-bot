@@ -77,6 +77,18 @@ _llm = None
 _answer_cache = {}
 
 
+def reset_runtime_cache():
+    """Force the next question to reload the updated vector database."""
+    global _embeddings
+    global _vectorstore
+    global _llm
+
+    _embeddings = None
+    _vectorstore = None
+    _llm = None
+    _answer_cache.clear()
+
+
 # VECTORSTORE
 
 def _get_vectorstore():
@@ -236,6 +248,11 @@ def _answer_from_documents(
             "",
         )
 
+        source_url = chunk.metadata.get(
+            "source_url",
+            "",
+        )
+
         document_language = (
             chunk.metadata.get(
                 "language",
@@ -252,6 +269,9 @@ SOURCE SCHEME:
 SOURCE FILE:
 {source_file}
 
+OFFICIAL SOURCE URL:
+{source_url or "Not recorded"}
+
 SOURCE DOCUMENT LANGUAGE:
 {document_language}
 
@@ -261,11 +281,9 @@ CONTENT:
         )
 
 
-        source_name = (
-            f"{scheme} ({source_file})"
-            if source_file
-            else scheme
-        )
+        source_name = f"{scheme} ({source_file})" if source_file else scheme
+        if source_url:
+            source_name += f" - {source_url}"
 
 
         if source_name not in sources:

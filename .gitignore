@@ -7,8 +7,12 @@ __pycache__/
 .venv/
 venv/
 
-# Vector database (regenerate with ingest.py, don't need to commit it)
-vectorstore/
+# Vector database is committed so hosted deployments have retrieval data.
+history.db
+history.db
+
+# Local runtime data
+history.db
 
 # OS files
 .DS_Store

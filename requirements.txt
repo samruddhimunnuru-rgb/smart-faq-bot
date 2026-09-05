@@ -11,6 +11,8 @@ pypdf
 langchain-ollama
 ollama
 python-dotenv
+requests
+supabase
 deep-translator
 gTTS
 SpeechRecognition

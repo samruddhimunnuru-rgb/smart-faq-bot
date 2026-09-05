@@ -130,10 +130,71 @@ and confirm it gives a sensible, sourced answer.
 ### 6. Launch the app
 
 ```bash
-streamlit run app.py
+streamlit run app.py --server.address 0.0.0.0 --server.port 8501
 ```
 
 This opens a browser window with the chat interface.
+
+On Windows, when the project was copied from another computer, use the installed
+Python interpreter instead of the old virtual environment:
+
+```powershell
+py -3.13 -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
+```
+
+### 7. Public deployment
+
+Run ingestion once, commit the generated `vectorstore/` folder, then push the
+project to GitHub and create a Streamlit Community Cloud app from the
+repository. Set the main file to `app.py`.
+
+```bash
+python -m src.ingest
+```
+
+For a container host such as Render, add a Docker service that runs
+`pip install -r requirements.txt`, then `python -m src.ingest`, and starts:
+
+```bash
+python -m streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
+```
+
+Before deploying, set these Render environment variables:
+
+```text
+OLLAMA_BASE_URL=https://your-reachable-ollama-server.example.com
+OLLAMA_MODEL=llama3.2:3b
+```
+
+`OLLAMA_BASE_URL` must point to an internet-reachable Ollama server. The default
+`http://localhost:11434` only works when Ollama is running on the same machine
+as the app, so it cannot be used by a public cloud deployment.
+
+### 8. Persistent document storage with Supabase
+
+Create a free Supabase project, then create a private Storage bucket named
+`scheme-documents`. In the Supabase SQL editor, create the metadata table:
+
+```sql
+create table documents (
+  filename text primary key,
+  source_url text not null,
+  created_at timestamptz not null default now()
+);
+```
+
+Add these values to Streamlit Cloud under **App settings > Secrets**:
+
+```toml
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key"
+SUPABASE_BUCKET = "scheme-documents"
+```
+
+Use the service-role key only in Streamlit Cloud Secrets. Never commit it to
+GitHub or put it in a public `.env` file. The app stores only PDFs accepted from
+official `.gov.in` or `.nic.in` URLs and restores them from Supabase after a
+restart.
 
 ## Example Questions to Demo
 

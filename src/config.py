@@ -21,6 +21,9 @@ load_dotenv()
 
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", "8501"))
+
 
 # PATHS
 
@@ -29,6 +32,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "schemes"
 
 VECTORSTORE_DIR = BASE_DIR / "vectorstore"
+
+SOURCE_REGISTRY_PATH = BASE_DIR / "data" / "source_registry.json"
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "scheme-documents")
 
 # CHUNKING
 
@@ -76,6 +85,10 @@ OLLAMA_BASE_URL = os.getenv(
     "OLLAMA_BASE_URL",
     "http://localhost:11434"
 )
+
+# PUBLIC DEPLOYMENT / CLOUD MODE
+# If a hosted Ollama endpoint is supplied, this app will use it automatically.
+# Example: OLLAMA_BASE_URL=https://your-ollama-service.example.com
 
 
 # SYSTEM PROMPT

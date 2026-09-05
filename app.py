@@ -21,6 +21,14 @@ Features:
 
 import streamlit as st
 from datetime import datetime
+from pathlib import Path
+import json
+import os
+import re
+from urllib.parse import urlsplit
+
+import requests
+from supabase import create_client
 
 
 # ============================================================
@@ -29,11 +37,118 @@ from datetime import datetime
 
 from src.rag_chain import (
     answer_question,
+    reset_runtime_cache,
 )
+
+from src.ingest import (
+    build_vectorstore,
+    chunk_documents,
+    load_all_documents,
+)
+
+
+
+def is_official_url(url):
+    parsed = urlsplit(url.strip())
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    return (
+        parsed.scheme == "https"
+        and (
+            hostname.endswith((".gov.in", ".nic.in"))
+            or hostname in {"gov.in", "nic.in"}
+        )
+    )
+
+
+def download_official_pdf(url):
+    url = url.strip()
+    if not is_official_url(url):
+        raise ValueError("Use an HTTPS URL from a .gov.in or .nic.in domain.")
+
+    response = requests.get(url, timeout=45, allow_redirects=True)
+    response.raise_for_status()
+    final_url = response.url
+    if not is_official_url(final_url):
+        raise ValueError("The download redirected outside an official government domain.")
+
+    content = response.content
+    content_type = response.headers.get("content-type", "").lower()
+    if not content.startswith(b"%PDF") and "application/pdf" not in content_type:
+        raise ValueError("The official URL did not return a PDF document.")
+
+    filename = Path(urlsplit(final_url).path).name or "government-document.pdf"
+    filename = re.sub(r"[^A-Za-z0-9._-]", "_", filename)
+    if not filename.lower().endswith(".pdf"):
+        filename += ".pdf"
+    return filename, content, final_url
 
 from src.config import (
     DATA_DIR,
+    SOURCE_REGISTRY_PATH,
+    VECTORSTORE_DIR,
 )
+
+
+
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "scheme-documents")
+
+
+def supabase_is_configured():
+    return bool(
+        os.getenv("SUPABASE_URL")
+        and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    )
+
+
+def get_supabase_client():
+    if not supabase_is_configured():
+        raise RuntimeError("Supabase credentials are not configured.")
+    return create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+    )
+
+
+def save_supabase_document(filename, content, source_url):
+    client = get_supabase_client()
+    client.storage.from_(SUPABASE_BUCKET).upload(
+        filename,
+        content,
+        {"content-type": "application/pdf", "upsert": "true"},
+    )
+    client.table("documents").upsert(
+        {"filename": filename, "source_url": source_url},
+        on_conflict="filename",
+    ).execute()
+
+
+def sync_documents_to_local():
+    if not supabase_is_configured():
+        return False
+
+    client = get_supabase_client()
+    rows = client.table("documents").select("filename,source_url").execute().data or []
+    if not rows:
+        return False
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    registry = {}
+    changed = False
+    for row in rows:
+        filename = Path(row["filename"]).name
+        content = client.storage.from_(SUPABASE_BUCKET).download(filename)
+        target = DATA_DIR / filename
+        if not target.exists() or target.read_bytes() != content:
+            target.write_bytes(content)
+            changed = True
+        registry[filename] = row.get("source_url", "")
+
+    SOURCE_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SOURCE_REGISTRY_PATH.write_text(
+        json.dumps(registry, indent=2),
+        encoding="utf-8",
+    )
+    return changed
 
 from src.history import (
     add_query,
@@ -361,6 +476,19 @@ if "pending_question" not in st.session_state:
     st.session_state.pending_question = None
 
 
+if "supabase_sync_done" not in st.session_state:
+    st.session_state.supabase_sync_done = True
+    if supabase_is_configured():
+        try:
+            with st.spinner("Syncing saved documents..."):
+                remote_documents_changed = sync_documents_to_local()
+                if remote_documents_changed or not VECTORSTORE_DIR.exists():
+                    build_vectorstore(chunk_documents(load_all_documents()))
+                    reset_runtime_cache()
+        except Exception as error:
+            st.warning(f"Persistent document storage is unavailable: {error}")
+
+
 # ============================================================
 # PAGE HEADER
 # ============================================================
@@ -405,6 +533,125 @@ st.caption(
 # ============================================================
 
 with st.sidebar:
+
+    # ========================================================
+    # ADD OFFICIAL SCHEME DOCUMENTS
+    # ========================================================
+
+    st.header("📤 Add official documents")
+
+    st.caption(
+        "Only HTTPS .gov.in and .nic.in sources are accepted. "
+        "The source URL is stored with the indexed document."
+    )
+
+    official_url = st.text_input(
+        "Official government PDF URL",
+        placeholder="https://department.gov.in/document.pdf",
+        key="official_document_url",
+    )
+
+    if st.button(
+        "Download from official portal",
+        use_container_width=True,
+    ):
+        try:
+            filename, content, final_url = download_official_pdf(official_url)
+            save_supabase_document(filename, content, final_url)
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            (DATA_DIR / filename).write_bytes(content)
+
+            source_registry = {}
+            if SOURCE_REGISTRY_PATH.exists():
+                source_registry = json.loads(
+                    SOURCE_REGISTRY_PATH.read_text(encoding="utf-8")
+                )
+            source_registry[filename] = final_url
+            SOURCE_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            SOURCE_REGISTRY_PATH.write_text(
+                json.dumps(source_registry, indent=2),
+                encoding="utf-8",
+            )
+
+            with st.spinner("Indexing the official document..."):
+                build_vectorstore(chunk_documents(load_all_documents()))
+                reset_runtime_cache()
+            st.success(f"Added {filename} from the official portal.")
+        except Exception as error:
+            st.error(f"Official document was not added: {error}")
+
+    st.divider()
+
+    st.subheader("Upload an official document")
+
+    uploaded_files = st.file_uploader(
+        "Upload a PDF downloaded from the official portal",
+        type=["pdf"],
+        accept_multiple_files=False,
+        help="Upload a document downloaded from an official government portal.",
+        key="uploaded_document",
+    )
+
+    upload_source_url = st.text_input(
+        "Source URL for this uploaded document",
+        placeholder="https://department.gov.in/document.pdf",
+        key="uploaded_source_url",
+    )
+
+    if uploaded_files and st.button(
+        "Add upload and update search",
+        use_container_width=True,
+        type="primary",
+    ):
+        if not is_official_url(upload_source_url):
+            st.error("Enter an HTTPS .gov.in or .nic.in source URL first.")
+            st.stop()
+
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+        try:
+            official_filename, official_content, final_url = download_official_pdf(
+                upload_source_url
+            )
+        except Exception as error:
+            st.error(f"Could not verify the official PDF URL: {error}")
+            st.stop()
+
+        if uploaded_files.getvalue() != official_content:
+            st.error(
+                "The uploaded PDF does not exactly match the PDF at the official URL. "
+                "Use the direct-download button or upload the exact downloaded file."
+            )
+            st.stop()
+
+        target_path = DATA_DIR / official_filename
+        target_path.write_bytes(official_content)
+        save_supabase_document(official_filename, official_content, final_url)
+
+        source_registry = {}
+        if SOURCE_REGISTRY_PATH.exists():
+            source_registry = json.loads(
+                SOURCE_REGISTRY_PATH.read_text(encoding="utf-8")
+            )
+        source_registry[target_path.name] = final_url
+        SOURCE_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SOURCE_REGISTRY_PATH.write_text(
+            json.dumps(source_registry, indent=2),
+            encoding="utf-8",
+        )
+
+        with st.spinner("Indexing the approved documents..."):
+            build_vectorstore(chunk_documents(load_all_documents()))
+            reset_runtime_cache()
+
+        st.success("Added the document. The new content is searchable.")
+
+    st.caption(
+        "The app checks the source domain, but always verify the document "
+        "using the linked official portal before relying on an answer."
+    )
+
+    st.divider()
 
     # ========================================================
     # SCHEMES COVERED
@@ -1019,8 +1266,19 @@ if question:
 
         elif sources:
 
+            has_official_source = any(
+                "https://" in source
+                for source in sources
+            )
+
+            source_label = (
+                "✅ Official source recorded"
+                if has_official_source
+                else "⚠️ Source URL not recorded"
+            )
+
             st.markdown(
-               f'<span class="gov-badge gov-badge-verified">✅ Verified: '
+               f'<span class="gov-badge gov-badge-verified">{source_label}: '
                f'{", ".join(sources)}</span>',
         unsafe_allow_html=True,
     )

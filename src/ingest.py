@@ -16,6 +16,7 @@ are added, removed, or modified.
 
 import sys
 import shutil
+import json
 from pathlib import Path
 
 
@@ -69,6 +70,7 @@ from src.config import (
     CHUNK_OVERLAP,
     EMBEDDING_MODEL_NAME,
     SUPPORTED_LANGUAGES,
+    SOURCE_REGISTRY_PATH,
 )
 
 
@@ -173,6 +175,12 @@ def detect_document_language(text: str) -> str:
 def load_all_documents():
 
     all_docs = []
+
+    source_registry = {}
+    if SOURCE_REGISTRY_PATH.exists():
+        source_registry = json.loads(
+            SOURCE_REGISTRY_PATH.read_text(encoding="utf-8")
+        )
 
 
     # --------------------------------------------------------
@@ -340,6 +348,11 @@ def load_all_documents():
 
             doc.metadata["source_file"] = (
                 file_path.name
+            )
+
+            doc.metadata["source_url"] = source_registry.get(
+                file_path.name,
+                "",
             )
 
 
