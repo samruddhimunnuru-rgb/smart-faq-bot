@@ -407,6 +407,19 @@ def answer_question(
         )
 
 
+    except OSError as e:
+
+        result = (
+            "⚠️ The answer model is unavailable. Streamlit Cloud cannot reach "
+            f"{OLLAMA_BASE_URL}. Set OLLAMA_BASE_URL in Streamlit Cloud Secrets "
+            "to a public Ollama server and make sure the configured model is installed.",
+            [],
+            [],
+            False,
+        )
+
+        return result
+
     except Exception as e:
 
         result = (

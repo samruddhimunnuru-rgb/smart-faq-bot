@@ -191,6 +191,17 @@ SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key"
 SUPABASE_BUCKET = "scheme-documents"
 ```
 
+Also add the model endpoint required for answers:
+
+```toml
+OLLAMA_BASE_URL = "https://your-public-ollama-server.example.com"
+OLLAMA_MODEL = "llama3.2:3b"
+```
+
+Do not use `http://localhost:11434` in Streamlit Cloud. That address points to
+the cloud container itself, not the computer running Ollama. The server must be
+reachable from the internet and must already have the selected model downloaded.
+
 Use the service-role key only in Streamlit Cloud Secrets. Never commit it to
 GitHub or put it in a public `.env` file. The app stores only PDFs accepted from
 official `.gov.in` or `.nic.in` URLs and restores them from Supabase after a
