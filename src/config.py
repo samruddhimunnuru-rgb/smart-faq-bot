@@ -75,7 +75,7 @@ SUPPORTED_LANGUAGES = {
 
 EMBEDDING_MODEL_NAME = os.getenv(
     "EMBEDDING_MODEL",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L3-v2"
 )
 
 # RETRIEVAL
