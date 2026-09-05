@@ -82,6 +82,14 @@ def download_official_pdf(url):
         filename += ".pdf"
     return filename, content, final_url
 
+
+OFFICIAL_DOCUMENTS = {
+    "PM-KISAN Operational Guidelines": (
+        "https://pmkisan.gov.in/Documents/"
+        "RevisedPM-KISANOperationalGuidelines(English).pdf"
+    ),
+}
+
 from src.config import (
     DATA_DIR,
     SOURCE_REGISTRY_PATH,
@@ -538,26 +546,28 @@ with st.sidebar:
     # ADD OFFICIAL SCHEME DOCUMENTS
     # ========================================================
 
-    st.header("📤 Add official documents")
+    st.header("📥 Official government documents")
 
     st.caption(
-        "Only HTTPS .gov.in and .nic.in sources are accepted. "
-        "The source URL is stored with the indexed document."
+        "Documents are downloaded directly from verified government portals. "
+        "No manual upload is required."
     )
 
-    official_url = st.text_input(
-        "Official government PDF URL",
-        placeholder="https://department.gov.in/document.pdf",
-        key="official_document_url",
+    selected_document = st.selectbox(
+        "Select an approved government guideline",
+        list(OFFICIAL_DOCUMENTS),
+        key="official_document_choice",
     )
 
     if st.button(
-        "Download from official portal",
+        "Fetch and index official guideline",
         use_container_width=True,
     ):
         try:
+            official_url = OFFICIAL_DOCUMENTS[selected_document]
             filename, content, final_url = download_official_pdf(official_url)
-            save_supabase_document(filename, content, final_url)
+            if supabase_is_configured():
+                save_supabase_document(filename, content, final_url)
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             (DATA_DIR / filename).write_bytes(content)
 
@@ -580,75 +590,9 @@ with st.sidebar:
         except Exception as error:
             st.error(f"Official document was not added: {error}")
 
-    st.divider()
-
-    st.subheader("Upload an official document")
-
-    uploaded_files = st.file_uploader(
-        "Upload a PDF downloaded from the official portal",
-        type=["pdf"],
-        accept_multiple_files=False,
-        help="Upload a document downloaded from an official government portal.",
-        key="uploaded_document",
-    )
-
-    upload_source_url = st.text_input(
-        "Source URL for this uploaded document",
-        placeholder="https://department.gov.in/document.pdf",
-        key="uploaded_source_url",
-    )
-
-    if uploaded_files and st.button(
-        "Add upload and update search",
-        use_container_width=True,
-        type="primary",
-    ):
-        if not is_official_url(upload_source_url):
-            st.error("Enter an HTTPS .gov.in or .nic.in source URL first.")
-            st.stop()
-
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-        try:
-            official_filename, official_content, final_url = download_official_pdf(
-                upload_source_url
-            )
-        except Exception as error:
-            st.error(f"Could not verify the official PDF URL: {error}")
-            st.stop()
-
-        if uploaded_files.getvalue() != official_content:
-            st.error(
-                "The uploaded PDF does not exactly match the PDF at the official URL. "
-                "Use the direct-download button or upload the exact downloaded file."
-            )
-            st.stop()
-
-        target_path = DATA_DIR / official_filename
-        target_path.write_bytes(official_content)
-        save_supabase_document(official_filename, official_content, final_url)
-
-        source_registry = {}
-        if SOURCE_REGISTRY_PATH.exists():
-            source_registry = json.loads(
-                SOURCE_REGISTRY_PATH.read_text(encoding="utf-8")
-            )
-        source_registry[target_path.name] = final_url
-        SOURCE_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        SOURCE_REGISTRY_PATH.write_text(
-            json.dumps(source_registry, indent=2),
-            encoding="utf-8",
-        )
-
-        with st.spinner("Indexing the approved documents..."):
-            build_vectorstore(chunk_documents(load_all_documents()))
-            reset_runtime_cache()
-
-        st.success("Added the document. The new content is searchable.")
-
     st.caption(
-        "The app checks the source domain, but always verify the document "
-        "using the linked official portal before relying on an answer."
+        "The source URL is stored with the index. Verify the linked government "
+        "portal before relying on an answer."
     )
 
     st.divider()
