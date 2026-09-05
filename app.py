@@ -581,7 +581,13 @@ with st.sidebar:
             official_url = OFFICIAL_DOCUMENTS[selected_document]
             filename, content, final_url = download_official_pdf(official_url)
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            (DATA_DIR / filename).write_bytes(content)
+            target_path = DATA_DIR / filename
+            index_needed = (
+                not target_path.exists()
+                or target_path.read_bytes() != content
+                or not VECTORSTORE_DIR.exists()
+            )
+            target_path.write_bytes(content)
 
             source_registry = {}
             if SOURCE_REGISTRY_PATH.exists():
@@ -595,23 +601,23 @@ with st.sidebar:
                 encoding="utf-8",
             )
 
-            with st.spinner("Indexing the official document..."):
-                build_vectorstore(chunk_documents(load_all_documents()))
-                reset_runtime_cache()
+            if index_needed:
+                with st.spinner("Indexing the official document..."):
+                    build_vectorstore(chunk_documents(load_all_documents()))
+                    reset_runtime_cache()
 
             if supabase_is_configured():
                 try:
                     save_supabase_document(filename, content, final_url)
-                    st.success(
-                        f"Added {filename} from the official portal and saved it permanently."
-                    )
+                    message = f"Loaded {filename} from the official portal and saved it permanently."
                 except Exception as storage_error:
-                    st.warning(
-                        "The official document was indexed, but Supabase storage failed. "
+                    message = (
+                        "Loaded the official document, but Supabase storage failed. "
                         f"Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY: {storage_error}"
                     )
+                st.warning(message) if "failed" in message else st.success(message)
             else:
-                st.success(f"Added {filename} from the official portal.")
+                st.success(f"Loaded {filename} from the official portal.")
         except Exception as error:
             st.error(
                 "The official document could not be downloaded or indexed. "
