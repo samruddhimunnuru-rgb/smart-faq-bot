@@ -42,6 +42,7 @@ from src.rag_chain import (
 )
 
 from src.ingest import (
+    append_to_vectorstore,
     build_vectorstore,
     chunk_documents,
     load_all_documents,
@@ -603,7 +604,16 @@ with st.sidebar:
 
             if index_needed:
                 with st.spinner("Indexing the official document..."):
-                    build_vectorstore(chunk_documents(load_all_documents()))
+                    all_chunks = chunk_documents(load_all_documents())
+                    new_chunks = [
+                        chunk
+                        for chunk in all_chunks
+                        if chunk.metadata.get("source_file") == filename
+                    ]
+                    if VECTORSTORE_DIR.exists() and any(VECTORSTORE_DIR.iterdir()):
+                        append_to_vectorstore(new_chunks)
+                    else:
+                        build_vectorstore(all_chunks)
                     reset_runtime_cache()
 
             if supabase_is_configured():

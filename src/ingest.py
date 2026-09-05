@@ -779,6 +779,24 @@ def build_vectorstore(chunks):
     print("=" * 70)
 
 
+def append_to_vectorstore(chunks):
+    """Add new chunks without rebuilding the existing Chroma database."""
+    if not chunks:
+        raise RuntimeError("No text could be extracted from the new document.")
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL_NAME,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+    vectorstore = Chroma(
+        collection_name="government_schemes",
+        persist_directory=str(VECTORSTORE_DIR),
+        embedding_function=embeddings,
+    )
+    vectorstore.add_documents(chunks)
+
+
 # ============================================================
 # MAIN
 # ============================================================
