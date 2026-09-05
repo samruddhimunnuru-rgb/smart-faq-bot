@@ -566,8 +566,6 @@ with st.sidebar:
         try:
             official_url = OFFICIAL_DOCUMENTS[selected_document]
             filename, content, final_url = download_official_pdf(official_url)
-            if supabase_is_configured():
-                save_supabase_document(filename, content, final_url)
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             (DATA_DIR / filename).write_bytes(content)
 
@@ -586,9 +584,25 @@ with st.sidebar:
             with st.spinner("Indexing the official document..."):
                 build_vectorstore(chunk_documents(load_all_documents()))
                 reset_runtime_cache()
-            st.success(f"Added {filename} from the official portal.")
+
+            if supabase_is_configured():
+                try:
+                    save_supabase_document(filename, content, final_url)
+                    st.success(
+                        f"Added {filename} from the official portal and saved it permanently."
+                    )
+                except Exception as storage_error:
+                    st.warning(
+                        "The official document was indexed, but Supabase storage failed. "
+                        f"Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY: {storage_error}"
+                    )
+            else:
+                st.success(f"Added {filename} from the official portal.")
         except Exception as error:
-            st.error(f"Official document was not added: {error}")
+            st.error(
+                "The official document could not be downloaded or indexed. "
+                f"Please try again: {error}"
+            )
 
     st.caption(
         "The source URL is stored with the index. Verify the linked government "
