@@ -12,6 +12,7 @@ Architecture:
 """
 
 import os
+import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -29,11 +30,20 @@ PORT = int(os.getenv("PORT", "8501"))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DATA_DIR = BASE_DIR / "data" / "schemes"
+RUNTIME_DIR = Path(
+    os.getenv(
+        "SMART_FAQ_RUNTIME_DIR",
+        str(Path(tempfile.gettempdir()) / "smart-faq-bot-runtime"),
+    )
+)
 
-VECTORSTORE_DIR = BASE_DIR / "vectorstore"
+SOURCE_DATA_DIR = BASE_DIR / "data" / "schemes"
+DATA_DIR = RUNTIME_DIR / "data" / "schemes"
 
-SOURCE_REGISTRY_PATH = BASE_DIR / "data" / "source_registry.json"
+SOURCE_VECTORSTORE_DIR = BASE_DIR / "vectorstore"
+VECTORSTORE_DIR = RUNTIME_DIR / "vectorstore"
+
+SOURCE_REGISTRY_PATH = RUNTIME_DIR / "source_registry.json"
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")

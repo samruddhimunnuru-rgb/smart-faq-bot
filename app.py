@@ -25,6 +25,7 @@ from pathlib import Path
 import json
 import os
 import re
+import shutil
 from urllib.parse import urlsplit
 
 import requests
@@ -92,6 +93,8 @@ OFFICIAL_DOCUMENTS = {
 
 from src.config import (
     DATA_DIR,
+    SOURCE_DATA_DIR,
+    SOURCE_VECTORSTORE_DIR,
     SOURCE_REGISTRY_PATH,
     VECTORSTORE_DIR,
 )
@@ -482,6 +485,17 @@ if "messages" not in st.session_state:
 if "pending_question" not in st.session_state:
 
     st.session_state.pending_question = None
+
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+if SOURCE_DATA_DIR.exists() and not any(DATA_DIR.iterdir()):
+    for source_file in SOURCE_DATA_DIR.iterdir():
+        if source_file.is_file():
+            shutil.copy2(source_file, DATA_DIR / source_file.name)
+
+VECTORSTORE_DIR.parent.mkdir(parents=True, exist_ok=True)
+if SOURCE_VECTORSTORE_DIR.exists() and not VECTORSTORE_DIR.exists():
+    shutil.copytree(SOURCE_VECTORSTORE_DIR, VECTORSTORE_DIR)
 
 
 if "supabase_sync_done" not in st.session_state:
