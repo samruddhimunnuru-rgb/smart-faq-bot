@@ -81,7 +81,7 @@ _vectorstore = None
 _llm = None
 
 _answer_cache = {}
-_CACHE_VERSION = "official-documents-only-v2"
+_CACHE_VERSION = "official-documents-bullets-v3"
 
 
 def reset_runtime_cache():
@@ -422,16 +422,23 @@ def _extractive_answer(chunks):
     excerpts = []
     for chunk in chunks[:2]:
         text = " ".join(chunk.page_content.split())
+        text = re.sub(r"\bpage\s+\d+\s+of\s+\d+\s*:?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bpage\s+\d+\s*:?\s*", "", text, flags=re.IGNORECASE)
         if text:
-            excerpts.append(text[:700].rstrip() + ("..." if len(text) > 700 else ""))
+            sentences = re.split(r"(?<=[.!?])\s+", text[:900])
+            bullets = [
+                sentence.strip()
+                for sentence in sentences
+                if sentence.strip()
+            ][:5]
+            excerpts.append("\n".join(f"- {bullet}" for bullet in bullets))
 
     if not excerpts:
         return FALLBACK_MESSAGE
 
     return (
-        "The answer service is temporarily unavailable, but these approved "
-        "document excerpts may help:\n\n- "
-        + "\n\n- ".join(excerpts)
+        "Based on the approved government documents:\n\n"
+        + "\n\n".join(excerpts)
         + "\n\nPlease verify the details in the official source before applying."
     )
 
