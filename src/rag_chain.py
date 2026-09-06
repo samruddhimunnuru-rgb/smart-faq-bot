@@ -81,6 +81,7 @@ _vectorstore = None
 _llm = None
 
 _answer_cache = {}
+_CACHE_VERSION = "official-documents-only-v2"
 
 
 def reset_runtime_cache():
@@ -458,6 +459,7 @@ def answer_question(
     # CACHE
 
     cache_key = (
+        _CACHE_VERSION,
         question.lower(),
         question_language,
     )

@@ -569,6 +569,12 @@ if "messages" not in st.session_state:
 
     st.session_state.messages = []
 
+APP_VERSION = "official-documents-only-v2"
+if st.session_state.get("app_version") != APP_VERSION:
+    st.session_state.app_version = APP_VERSION
+    st.session_state.messages = []
+    st.session_state.pending_question = None
+
 
 if "pending_question" not in st.session_state:
 
@@ -1467,30 +1473,10 @@ if question:
         # SOURCE
         # ====================================================
 
-        if is_from_web:
-
-            st.warning(
-                "🌐 This answer came from a "
-                "web source, not an approved "
-                "document."
-            )
-
-
-        elif sources:
-
-            has_official_source = any(
-                "https://" in source
-                for source in sources
-            )
-
-            source_label = (
-                "✅ Official source recorded"
-                if has_official_source
-                else "⚠️ Source URL not recorded"
-            )
+        if sources:
 
             st.markdown(
-               f'<span class="gov-badge gov-badge-verified">{source_label}: '
+               f'<span class="gov-badge gov-badge-verified">✅ Approved document: '
                f'{", ".join(sources)}</span>',
         unsafe_allow_html=True,
     )
