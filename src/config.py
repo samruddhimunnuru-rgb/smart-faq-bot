@@ -15,6 +15,7 @@ import os
 import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
+from urllib.parse import urlsplit
 
 # ENVIRONMENT
 
@@ -91,10 +92,13 @@ OLLAMA_MODEL = os.getenv(
     "llama3.2:3b"
 )
 
-OLLAMA_BASE_URL = os.getenv(
+_ollama_base_url = os.getenv(
     "OLLAMA_BASE_URL",
-    "http://localhost:11434"
-)
+    "http://localhost:11434",
+).strip().rstrip("/")
+if _ollama_base_url and not urlsplit(_ollama_base_url).scheme:
+    _ollama_base_url = f"https://{_ollama_base_url}"
+OLLAMA_BASE_URL = _ollama_base_url
 
 # PUBLIC DEPLOYMENT / CLOUD MODE
 # If a hosted Ollama endpoint is supplied, this app will use it automatically.

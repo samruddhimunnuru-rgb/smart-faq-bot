@@ -503,13 +503,20 @@ def answer_question(
 
         return result
 
-    except Exception as e:
+    except Exception:
+        try:
+            source_chunks = _retrieve_from_source_documents(question)
+        except Exception:
+            source_chunks = []
 
         result = (
-            f"⚠️ RAG error: {e}",
-            [],
-            [],
-            False,
+            _extractive_answer(source_chunks),
+            [
+                chunk.metadata.get("source_file", "Approved scheme document")
+                for chunk in source_chunks[:2]
+            ],
+            source_chunks,
+            bool(source_chunks),
         )
 
         return result
