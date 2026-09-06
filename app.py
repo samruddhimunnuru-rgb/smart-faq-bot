@@ -570,6 +570,55 @@ if "pending_question" not in st.session_state:
     st.session_state.pending_question = None
 
 
+if "show_chat" not in st.session_state:
+
+    st.session_state.show_chat = False
+
+
+if not st.session_state.show_chat:
+    st.markdown(
+        """
+        <section class="landing-hero">
+            <div class="landing-eyebrow">One trusted place for citizen services</div>
+            <h2>Understand government schemes in your language.</h2>
+            <p>
+                Ask simple questions about eligibility, documents, benefits, and
+                applications. Smart FAQ Bot finds answers from approved scheme
+                documents and explains them clearly.
+            </p>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    landing_columns = st.columns(3)
+    landing_cards = (
+        ("🌐", "Six Indian languages", "Ask in English, Hindi, Kannada, Tamil, Telugu, or Malayalam."),
+        ("📚", "Document-grounded", "Answers are based on indexed government scheme documents."),
+        ("✅", "Clear and practical", "Get the key eligibility, documents, and next steps in one place."),
+    )
+    for column, (icon, title, description) in zip(landing_columns, landing_cards):
+        with column:
+            st.markdown(
+                f"""
+                <div class="landing-card">
+                    <div class="landing-card-icon">{icon}</div>
+                    <strong>{title}</strong>
+                    <span>{description}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<div style='height: 18px'></div>", unsafe_allow_html=True)
+    if st.button("🚀 Start asking about government schemes", type="primary", use_container_width=True):
+        st.session_state.show_chat = True
+        st.rerun()
+
+    st.caption("Answers are generated from approved scheme documents. Always verify details with the official source.")
+    st.stop()
+
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 if SOURCE_DATA_DIR.exists() and not any(DATA_DIR.iterdir()):
     for source_file in SOURCE_DATA_DIR.iterdir():
@@ -595,42 +644,8 @@ if "supabase_sync_done" not in st.session_state:
 
 
 # ============================================================
-# PAGE HEADER
+# CHAT PAGE HEADER
 # ============================================================
-
-st.markdown(
-    """
-    <section class="landing-hero">
-        <div class="landing-eyebrow">One trusted place for citizen services</div>
-        <h2>Understand government schemes in your language.</h2>
-        <p>
-            Ask simple questions about eligibility, documents, benefits, and
-            applications. Smart FAQ Bot finds answers from approved scheme
-            documents and explains them clearly.
-        </p>
-    </section>
-    """,
-    unsafe_allow_html=True,
-)
-
-landing_columns = st.columns(3)
-landing_cards = (
-    ("🌐", "Six Indian languages", "Ask in English, Hindi, Kannada, Tamil, Telugu, or Malayalam."),
-    ("📚", "Document-grounded", "Answers are based on indexed government scheme documents."),
-    ("✅", "Clear and practical", "Get the key eligibility, documents, and next steps in one place."),
-)
-for column, (icon, title, description) in zip(landing_columns, landing_cards):
-    with column:
-        st.markdown(
-            f"""
-            <div class="landing-card">
-                <div class="landing-card-icon">{icon}</div>
-                <strong>{title}</strong>
-                <span>{description}</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
 if os.getenv("OLLAMA_BASE_URL", "").startswith("http://localhost"):
     st.markdown(
@@ -770,6 +785,10 @@ with st.sidebar:
     )
 
     st.divider()
+
+    if st.button("← Back to landing page", use_container_width=True):
+        st.session_state.show_chat = False
+        st.rerun()
 
     # ========================================================
     # SCHEMES COVERED
