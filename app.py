@@ -413,7 +413,8 @@ st.markdown(
        ======================================================== */
 
     section[data-testid="stSidebar"] {
-        display: none;
+        background-color: #FFFFFF;
+        border-right: 1px solid var(--gov-border);
     }
 
     section[data-testid="stSidebar"] h2,
@@ -707,6 +708,56 @@ st.caption(
 # ============================================================
 
 with st.sidebar:
+    st.markdown("## Smart FAQ Bot")
+    st.caption("Ask a question and get a clear answer from approved scheme documents.")
+
+    if st.button("← Back to landing page", key="clean_back_to_landing", use_container_width=True):
+        st.session_state.show_chat = False
+        st.rerun()
+
+    st.divider()
+    st.subheader("💡 Recommended questions")
+    recommended_questions = [
+        "How to apply for PM-Kisan?",
+        "Documents needed for Ayushman Bharat?",
+        "Who is eligible for government schemes?",
+    ]
+    for index, question in enumerate(recommended_questions):
+        if st.button(
+            question,
+            key=f"clean_recommended_question_{index}",
+            use_container_width=True,
+        ):
+            st.session_state.pending_question = question
+            st.rerun()
+
+    st.divider()
+    st.subheader("🕘 Recent questions")
+    recent_queries = get_recent_queries(limit=5)
+    if recent_queries:
+        for item in recent_queries:
+            question = item["question"]
+            display_question = question if len(question) <= 40 else question[:37] + "..."
+            if st.button(
+                f"💬 {display_question}",
+                key=f"clean_history_question_{item['id']}",
+                use_container_width=True,
+            ):
+                st.session_state.pending_question = question
+                st.rerun()
+    else:
+        st.caption("Your recent questions will appear here.")
+
+    st.divider()
+    if st.button("🗑️ Clear current chat", key="clean_clear_chat", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.pending_question = None
+        st.rerun()
+
+
+if False:
+    with st.sidebar:
+        pass
 
     # ========================================================
     # ADD OFFICIAL SCHEME DOCUMENTS
