@@ -31,6 +31,12 @@ from urllib.parse import urlsplit
 import requests
 from supabase import create_client
 
+# Streamlit Cloud exposes secrets through st.secrets rather than a local .env
+# file. Load runtime settings before importing modules that read configuration.
+for _secret_name in ("OLLAMA_MODEL", "OLLAMA_BASE_URL"):
+    if _secret_name in st.secrets and _secret_name not in os.environ:
+        os.environ[_secret_name] = str(st.secrets[_secret_name])
+
 
 # ============================================================
 # PROJECT IMPORTS
@@ -327,6 +333,76 @@ st.markdown(
         margin-bottom: 20px;
     }
 
+    .landing-hero {
+        background: linear-gradient(135deg, #0B3D6B 0%, #12558F 58%, #0A3158 100%);
+        border-radius: 20px;
+        padding: 30px 32px;
+        margin: 20px 0 18px;
+        color: #FFFFFF;
+        box-shadow: 0 10px 24px rgba(11, 61, 107, 0.2);
+    }
+
+    .landing-eyebrow {
+        color: #F3C969;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+
+    .landing-hero h2 {
+        color: #FFFFFF;
+        font-size: 31px;
+        line-height: 1.15;
+        margin: 0 0 10px;
+    }
+
+    .landing-hero p {
+        color: #DCEBFA;
+        font-size: 15px;
+        line-height: 1.55;
+        margin: 0;
+        max-width: 620px;
+    }
+
+    .landing-card {
+        background: #FFFFFF;
+        border: 1px solid var(--gov-border);
+        border-radius: 14px;
+        padding: 16px;
+        min-height: 118px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+
+    .landing-card-icon {
+        font-size: 22px;
+        margin-bottom: 6px;
+    }
+
+    .landing-card strong {
+        color: var(--gov-navy);
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    .landing-card span {
+        color: var(--gov-muted);
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .connection-card {
+        background: #FFF8E8;
+        border: 1px solid #F0DBA0;
+        border-radius: 12px;
+        padding: 14px 16px;
+        color: #6B5416;
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 10px 0 18px;
+    }
+
     /* ========================================================
        SIDEBAR
        ======================================================== */
@@ -466,6 +542,12 @@ st.markdown(
             height: 38px;
             font-size: 19px;
         }
+        .landing-hero {
+            padding: 24px 20px;
+        }
+        .landing-hero h2 {
+            font-size: 25px;
+        }
     }
 
     </style>
@@ -515,6 +597,54 @@ if "supabase_sync_done" not in st.session_state:
 # ============================================================
 # PAGE HEADER
 # ============================================================
+
+st.markdown(
+    """
+    <section class="landing-hero">
+        <div class="landing-eyebrow">One trusted place for citizen services</div>
+        <h2>Understand government schemes in your language.</h2>
+        <p>
+            Ask simple questions about eligibility, documents, benefits, and
+            applications. Smart FAQ Bot finds answers from approved scheme
+            documents and explains them clearly.
+        </p>
+    </section>
+    """,
+    unsafe_allow_html=True,
+)
+
+landing_columns = st.columns(3)
+landing_cards = (
+    ("🌐", "Six Indian languages", "Ask in English, Hindi, Kannada, Tamil, Telugu, or Malayalam."),
+    ("📚", "Document-grounded", "Answers are based on indexed government scheme documents."),
+    ("✅", "Clear and practical", "Get the key eligibility, documents, and next steps in one place."),
+)
+for column, (icon, title, description) in zip(landing_columns, landing_cards):
+    with column:
+        st.markdown(
+            f"""
+            <div class="landing-card">
+                <div class="landing-card-icon">{icon}</div>
+                <strong>{title}</strong>
+                <span>{description}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+if os.getenv("OLLAMA_BASE_URL", "").startswith("http://localhost"):
+    st.markdown(
+        """
+        <div class="connection-card">
+            <strong>Answer service needs configuration.</strong><br>
+            This deployed app is still pointing to local Ollama. Add
+            <code>OLLAMA_BASE_URL</code> and <code>OLLAMA_MODEL</code> to
+            Streamlit Cloud Secrets using a stable, publicly reachable Ollama
+            server. Temporary trycloudflare.com URLs expire and will stop working.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 st.markdown(
     """

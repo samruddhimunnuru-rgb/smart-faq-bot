@@ -407,12 +407,14 @@ def answer_question(
         )
 
 
-    except OSError as e:
+    except OSError:
 
         result = (
-            "⚠️ The answer model is unavailable. Streamlit Cloud cannot reach "
-            f"{OLLAMA_BASE_URL}. Set OLLAMA_BASE_URL in Streamlit Cloud Secrets "
-            "to a public Ollama server and make sure the configured model is installed.",
+            "⚠️ The answer service is unavailable. The configured Ollama endpoint "
+            f"({OLLAMA_BASE_URL}) could not be reached. In Streamlit Cloud, set "
+            "OLLAMA_BASE_URL and OLLAMA_MODEL in App Settings → Secrets to a "
+            "stable public Ollama server, then confirm the model is installed. "
+            "Temporary trycloudflare.com URLs expire and are not reliable for deployment.",
             [],
             [],
             False,
