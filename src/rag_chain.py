@@ -357,6 +357,26 @@ CONTENT:
         chunks,
     )
 
+
+def _extractive_answer(chunks):
+    """Return useful source excerpts when the optional LLM is unavailable."""
+    excerpts = []
+    for chunk in chunks[:2]:
+        text = " ".join(chunk.page_content.split())
+        if text:
+            excerpts.append(text[:700].rstrip() + ("..." if len(text) > 700 else ""))
+
+    if not excerpts:
+        return FALLBACK_MESSAGE
+
+    return (
+        "The answer service is temporarily unavailable, but these approved "
+        "document excerpts may help:\n\n- "
+        + "\n\n- ".join(excerpts)
+        + "\n\nPlease verify the details in the official source before applying."
+    )
+
+
 # MAIN ANSWER FUNCTION
 
 def answer_question(
@@ -408,16 +428,19 @@ def answer_question(
 
 
     except OSError:
+        try:
+            source_chunks = retrieve_chunks(question)
+        except Exception:
+            source_chunks = []
 
         result = (
-            "⚠️ The answer service is unavailable. The configured Ollama endpoint "
-            f"({OLLAMA_BASE_URL}) could not be reached. In Streamlit Cloud, set "
-            "OLLAMA_BASE_URL and OLLAMA_MODEL in App Settings → Secrets to a "
-            "stable public Ollama server, then confirm the model is installed. "
-            "Temporary trycloudflare.com URLs expire and are not reliable for deployment.",
-            [],
-            [],
-            False,
+            _extractive_answer(source_chunks),
+            [
+                chunk.metadata.get("source_file", "Approved scheme document")
+                for chunk in source_chunks[:2]
+            ],
+            source_chunks,
+            bool(source_chunks),
         )
 
         return result

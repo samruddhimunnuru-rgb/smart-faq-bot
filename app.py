@@ -654,20 +654,6 @@ if REMOTE_DOCUMENT_SYNC and "supabase_sync_done" not in st.session_state:
 # CHAT PAGE HEADER
 # ============================================================
 
-if os.getenv("OLLAMA_BASE_URL", "").startswith("http://localhost"):
-    st.markdown(
-        """
-        <div class="connection-card">
-            <strong>Answer service needs configuration.</strong><br>
-            This deployed app is still pointing to local Ollama. Add
-            <code>OLLAMA_BASE_URL</code> and <code>OLLAMA_MODEL</code> to
-            Streamlit Cloud Secrets using a stable, publicly reachable Ollama
-            server. Temporary trycloudflare.com URLs expire and will stop working.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
 st.markdown(
     """
     <div class="gov-banner">
