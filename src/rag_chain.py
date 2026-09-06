@@ -48,6 +48,11 @@ from langchain_community.vectorstores import (
     Chroma,
 )
 
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    TextLoader,
+)
+
 from langchain_ollama import (
     ChatOllama,
 )
@@ -208,6 +213,45 @@ def retrieve_chunks(
         question
     )
 
+
+def _retrieve_from_source_documents(question: str, limit: int = TOP_K):
+    """Find matching passages directly in official bundled documents."""
+    from src.config import DATA_DIR
+
+    terms = {
+        term.lower()
+        for term in question.split()
+        if len(term.strip("?!.,:;()")) > 2
+    }
+    matches = []
+
+    for source_path in sorted(DATA_DIR.iterdir()):
+        if source_path.suffix.lower() not in {".pdf", ".txt"}:
+            continue
+
+        try:
+            if source_path.suffix.lower() == ".pdf":
+                documents = PyPDFLoader(str(source_path)).load()
+            else:
+                documents = TextLoader(
+                    str(source_path),
+                    encoding="utf-8",
+                ).load()
+        except Exception:
+            continue
+
+        for document in documents:
+            content = document.page_content.strip()
+            content_terms = set(content.lower().split())
+            score = len(terms.intersection(content_terms))
+            if score:
+                document.metadata["source_file"] = source_path.name
+                matches.append((score, document))
+
+    matches.sort(key=lambda item: item[0], reverse=True)
+    return [document for _, document in matches[:limit]]
+
+
 # ANSWER FROM DOCUMENTS
 
 def _answer_from_documents(
@@ -218,6 +262,9 @@ def _answer_from_documents(
     chunks = retrieve_chunks(
         question
     )
+
+    if not chunks:
+        chunks = _retrieve_from_source_documents(question)
 
 
     if not chunks:
