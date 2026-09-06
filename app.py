@@ -37,6 +37,11 @@ for _secret_name in ("OLLAMA_MODEL", "OLLAMA_BASE_URL"):
     if _secret_name in st.secrets and _secret_name not in os.environ:
         os.environ[_secret_name] = str(st.secrets[_secret_name])
 
+REMOTE_DOCUMENT_SYNC = os.getenv(
+    "ENABLE_REMOTE_DOCUMENT_SYNC",
+    "false",
+).lower() == "true"
+
 
 # ============================================================
 # PROJECT IMPORTS
@@ -408,8 +413,7 @@ st.markdown(
        ======================================================== */
 
     section[data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid var(--gov-border);
+        display: none;
     }
 
     section[data-testid="stSidebar"] h2,
@@ -630,7 +634,7 @@ if SOURCE_VECTORSTORE_DIR.exists() and not VECTORSTORE_DIR.exists():
     shutil.copytree(SOURCE_VECTORSTORE_DIR, VECTORSTORE_DIR)
 
 
-if "supabase_sync_done" not in st.session_state:
+if REMOTE_DOCUMENT_SYNC and "supabase_sync_done" not in st.session_state:
     st.session_state.supabase_sync_done = True
     if supabase_is_configured():
         try:
@@ -639,8 +643,10 @@ if "supabase_sync_done" not in st.session_state:
                 if remote_documents_changed or not VECTORSTORE_DIR.exists():
                     build_vectorstore(chunk_documents(load_all_documents()))
                     reset_runtime_cache()
-        except Exception as error:
-            st.warning(f"Persistent document storage is unavailable: {error}")
+        except Exception:
+            # Local bundled documents remain available when optional remote
+            # storage is unavailable.
+            pass
 
 
 # ============================================================
