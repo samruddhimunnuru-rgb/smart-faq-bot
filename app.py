@@ -630,9 +630,41 @@ if SOURCE_DATA_DIR.exists() and not any(DATA_DIR.iterdir()):
         if source_file.is_file():
             shutil.copy2(source_file, DATA_DIR / source_file.name)
 
+if "official_documents_checked" not in st.session_state:
+    st.session_state.official_documents_checked = True
+    for document_url in OFFICIAL_DOCUMENTS.values():
+        try:
+            filename, content, final_url = download_official_pdf(document_url)
+            target_path = DATA_DIR / filename
+            if not target_path.exists():
+                target_path.write_bytes(content)
+                SOURCE_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+                registry = {}
+                if SOURCE_REGISTRY_PATH.exists():
+                    registry = json.loads(
+                        SOURCE_REGISTRY_PATH.read_text(encoding="utf-8")
+                    )
+                registry[filename] = final_url
+                SOURCE_REGISTRY_PATH.write_text(
+                    json.dumps(registry, indent=2),
+                    encoding="utf-8",
+                )
+        except Exception:
+            # Bundled official documents remain available if a government
+            # website is temporarily unavailable.
+            pass
+
 VECTORSTORE_DIR.parent.mkdir(parents=True, exist_ok=True)
 if SOURCE_VECTORSTORE_DIR.exists() and not VECTORSTORE_DIR.exists():
     shutil.copytree(SOURCE_VECTORSTORE_DIR, VECTORSTORE_DIR)
+
+if not VECTORSTORE_DIR.exists() or not any(VECTORSTORE_DIR.iterdir()):
+    try:
+        with st.spinner("Indexing official government documents..."):
+            build_vectorstore(chunk_documents(load_all_documents()))
+            reset_runtime_cache()
+    except Exception:
+        pass
 
 
 if REMOTE_DOCUMENT_SYNC and "supabase_sync_done" not in st.session_state:

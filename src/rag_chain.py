@@ -22,6 +22,7 @@ before retrieval.
 """
 
 import sys
+import re
 from pathlib import Path
 
 
@@ -216,16 +217,25 @@ def retrieve_chunks(
 
 def _retrieve_from_source_documents(question: str, limit: int = TOP_K):
     """Find matching passages directly in official bundled documents."""
-    from src.config import DATA_DIR
+    from src.config import DATA_DIR, SOURCE_DATA_DIR
 
     terms = {
-        term.lower()
-        for term in question.split()
-        if len(term.strip("?!.,:;()")) > 2
+        term
+        for term in re.findall(r"[a-z0-9]+", question.lower())
+        if len(term) > 2
     }
     matches = []
 
-    for source_path in sorted(DATA_DIR.iterdir()):
+    source_directories = [DATA_DIR]
+    if SOURCE_DATA_DIR.exists() and SOURCE_DATA_DIR != DATA_DIR:
+        source_directories.append(SOURCE_DATA_DIR)
+
+    source_paths = []
+    for source_directory in source_directories:
+        if source_directory.exists():
+            source_paths.extend(source_directory.iterdir())
+
+    for source_path in sorted(set(source_paths)):
         if source_path.suffix.lower() not in {".pdf", ".txt"}:
             continue
 
@@ -242,7 +252,7 @@ def _retrieve_from_source_documents(question: str, limit: int = TOP_K):
 
         for document in documents:
             content = document.page_content.strip()
-            content_terms = set(content.lower().split())
+            content_terms = set(re.findall(r"[a-z0-9]+", content.lower()))
             score = len(terms.intersection(content_terms))
             if score:
                 document.metadata["source_file"] = source_path.name
@@ -259,9 +269,10 @@ def _answer_from_documents(
     question_language: str,
 ):
 
-    chunks = retrieve_chunks(
-        question
-    )
+    try:
+        chunks = retrieve_chunks(question)
+    except Exception:
+        chunks = []
 
     if not chunks:
         chunks = _retrieve_from_source_documents(question)
