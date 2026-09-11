@@ -22,7 +22,6 @@ before retrieval.
 """
 
 import sys
-import re
 from pathlib import Path
 
 
@@ -47,11 +46,6 @@ from langchain_huggingface import (
 
 from langchain_community.vectorstores import (
     Chroma,
-)
-
-from langchain_community.document_loaders import (
-    PyPDFLoader,
-    TextLoader,
 )
 
 from langchain_ollama import (
@@ -81,7 +75,6 @@ _vectorstore = None
 _llm = None
 
 _answer_cache = {}
-_CACHE_VERSION = "official-documents-bullets-v3"
 
 
 def reset_runtime_cache():
@@ -215,54 +208,6 @@ def retrieve_chunks(
         question
     )
 
-
-def _retrieve_from_source_documents(question: str, limit: int = TOP_K):
-    """Find matching passages directly in official bundled documents."""
-    from src.config import DATA_DIR, SOURCE_DATA_DIR
-
-    terms = {
-        term
-        for term in re.findall(r"[a-z0-9]+", question.lower())
-        if len(term) > 2
-    }
-    matches = []
-
-    source_directories = [DATA_DIR]
-    if SOURCE_DATA_DIR.exists() and SOURCE_DATA_DIR != DATA_DIR:
-        source_directories.append(SOURCE_DATA_DIR)
-
-    source_paths = []
-    for source_directory in source_directories:
-        if source_directory.exists():
-            source_paths.extend(source_directory.iterdir())
-
-    for source_path in sorted(set(source_paths)):
-        if source_path.suffix.lower() not in {".pdf", ".txt"}:
-            continue
-
-        try:
-            if source_path.suffix.lower() == ".pdf":
-                documents = PyPDFLoader(str(source_path)).load()
-            else:
-                documents = TextLoader(
-                    str(source_path),
-                    encoding="utf-8",
-                ).load()
-        except Exception:
-            continue
-
-        for document in documents:
-            content = document.page_content.strip()
-            content_terms = set(re.findall(r"[a-z0-9]+", content.lower()))
-            score = len(terms.intersection(content_terms))
-            if score:
-                document.metadata["source_file"] = source_path.name
-                matches.append((score, document))
-
-    matches.sort(key=lambda item: item[0], reverse=True)
-    return [document for _, document in matches[:limit]]
-
-
 # ANSWER FROM DOCUMENTS
 
 def _answer_from_documents(
@@ -270,13 +215,9 @@ def _answer_from_documents(
     question_language: str,
 ):
 
-    try:
-        chunks = retrieve_chunks(question)
-    except Exception:
-        chunks = []
-
-    if not chunks:
-        chunks = _retrieve_from_source_documents(question)
+    chunks = retrieve_chunks(
+        question
+    )
 
 
     if not chunks:
@@ -416,33 +357,6 @@ CONTENT:
         chunks,
     )
 
-
-def _extractive_answer(chunks):
-    """Return useful source excerpts when the optional LLM is unavailable."""
-    excerpts = []
-    for chunk in chunks[:2]:
-        text = " ".join(chunk.page_content.split())
-        text = re.sub(r"\bpage\s+\d+\s+of\s+\d+\s*:?\s*", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"\bpage\s+\d+\s*:?\s*", "", text, flags=re.IGNORECASE)
-        if text:
-            sentences = re.split(r"(?<=[.!?])\s+", text[:900])
-            bullets = [
-                sentence.strip()
-                for sentence in sentences
-                if sentence.strip()
-            ][:5]
-            excerpts.append("\n".join(f"- {bullet}" for bullet in bullets))
-
-    if not excerpts:
-        return FALLBACK_MESSAGE
-
-    return (
-        "Based on the approved government documents:\n\n"
-        + "\n\n".join(excerpts)
-        + "\n\nPlease verify the details in the official source before applying."
-    )
-
-
 # MAIN ANSWER FUNCTION
 
 def answer_question(
@@ -466,7 +380,6 @@ def answer_question(
     # CACHE
 
     cache_key = (
-        _CACHE_VERSION,
         question.lower(),
         question_language,
     )
@@ -494,38 +407,26 @@ def answer_question(
         )
 
 
-    except OSError:
-        try:
-            source_chunks = retrieve_chunks(question)
-        except Exception:
-            source_chunks = []
+    except OSError as e:
 
         result = (
-            _extractive_answer(source_chunks),
-            [
-                chunk.metadata.get("source_file", "Approved scheme document")
-                for chunk in source_chunks[:2]
-            ],
-            source_chunks,
-            bool(source_chunks),
+            "⚠️ The answer model is unavailable. Streamlit Cloud cannot reach "
+            f"{OLLAMA_BASE_URL}. Set OLLAMA_BASE_URL in Streamlit Cloud Secrets "
+            "to a public Ollama server and make sure the configured model is installed.",
+            [],
+            [],
+            False,
         )
 
         return result
 
-    except Exception:
-        try:
-            source_chunks = _retrieve_from_source_documents(question)
-        except Exception:
-            source_chunks = []
+    except Exception as e:
 
         result = (
-            _extractive_answer(source_chunks),
-            [
-                chunk.metadata.get("source_file", "Approved scheme document")
-                for chunk in source_chunks[:2]
-            ],
-            source_chunks,
-            bool(source_chunks),
+            f"⚠️ RAG error: {e}",
+            [],
+            [],
+            False,
         )
 
         return result

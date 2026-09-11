@@ -12,6 +12,7 @@ torchvision
 transformers
 pypdf
 langchain-ollama
+langchain-openai
 ollama
 python-dotenv
 requests

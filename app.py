@@ -31,17 +31,6 @@ from urllib.parse import urlsplit
 import requests
 from supabase import create_client
 
-# Streamlit Cloud exposes secrets through st.secrets rather than a local .env
-# file. Load runtime settings before importing modules that read configuration.
-for _secret_name in ("OLLAMA_MODEL", "OLLAMA_BASE_URL"):
-    if _secret_name in st.secrets and _secret_name not in os.environ:
-        os.environ[_secret_name] = str(st.secrets[_secret_name])
-
-REMOTE_DOCUMENT_SYNC = os.getenv(
-    "ENABLE_REMOTE_DOCUMENT_SYNC",
-    "false",
-).lower() == "true"
-
 
 # ============================================================
 # PROJECT IMPORTS
@@ -338,76 +327,6 @@ st.markdown(
         margin-bottom: 20px;
     }
 
-    .landing-hero {
-        background: linear-gradient(135deg, #0B3D6B 0%, #12558F 58%, #0A3158 100%);
-        border-radius: 20px;
-        padding: 30px 32px;
-        margin: 20px 0 18px;
-        color: #FFFFFF;
-        box-shadow: 0 10px 24px rgba(11, 61, 107, 0.2);
-    }
-
-    .landing-eyebrow {
-        color: #F3C969;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 1.2px;
-        text-transform: uppercase;
-        margin-bottom: 10px;
-    }
-
-    .landing-hero h2 {
-        color: #FFFFFF;
-        font-size: 31px;
-        line-height: 1.15;
-        margin: 0 0 10px;
-    }
-
-    .landing-hero p {
-        color: #DCEBFA;
-        font-size: 15px;
-        line-height: 1.55;
-        margin: 0;
-        max-width: 620px;
-    }
-
-    .landing-card {
-        background: #FFFFFF;
-        border: 1px solid var(--gov-border);
-        border-radius: 14px;
-        padding: 16px;
-        min-height: 118px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    }
-
-    .landing-card-icon {
-        font-size: 22px;
-        margin-bottom: 6px;
-    }
-
-    .landing-card strong {
-        color: var(--gov-navy);
-        display: block;
-        margin-bottom: 5px;
-    }
-
-    .landing-card span {
-        color: var(--gov-muted);
-        font-size: 13px;
-        line-height: 1.4;
-    }
-
-    .connection-card {
-        background: #FFF8E8;
-        border: 1px solid #F0DBA0;
-        border-radius: 12px;
-        padding: 14px 16px;
-        color: #6B5416;
-        font-size: 13px;
-        line-height: 1.5;
-        margin: 10px 0 18px;
-    }
-
     /* ========================================================
        SIDEBAR
        ======================================================== */
@@ -547,12 +466,6 @@ st.markdown(
             height: 38px;
             font-size: 19px;
         }
-        .landing-hero {
-            padding: 24px 20px;
-        }
-        .landing-hero h2 {
-            font-size: 25px;
-        }
     }
 
     </style>
@@ -569,65 +482,10 @@ if "messages" not in st.session_state:
 
     st.session_state.messages = []
 
-APP_VERSION = "official-documents-only-v2"
-if st.session_state.get("app_version") != APP_VERSION:
-    st.session_state.app_version = APP_VERSION
-    st.session_state.messages = []
-    st.session_state.pending_question = None
-
 
 if "pending_question" not in st.session_state:
 
     st.session_state.pending_question = None
-
-
-if "show_chat" not in st.session_state:
-
-    st.session_state.show_chat = False
-
-
-if not st.session_state.show_chat:
-    st.markdown(
-        """
-        <section class="landing-hero">
-            <div class="landing-eyebrow">One trusted place for citizen services</div>
-            <h2>Understand government schemes in your language.</h2>
-            <p>
-                Ask simple questions about eligibility, documents, benefits, and
-                applications. Smart FAQ Bot finds answers from approved scheme
-                documents and explains them clearly.
-            </p>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    landing_columns = st.columns(3)
-    landing_cards = (
-        ("🌐", "Six Indian languages", "Ask in English, Hindi, Kannada, Tamil, Telugu, or Malayalam."),
-        ("📚", "Document-grounded", "Answers are based on indexed government scheme documents."),
-        ("✅", "Clear and practical", "Get the key eligibility, documents, and next steps in one place."),
-    )
-    for column, (icon, title, description) in zip(landing_columns, landing_cards):
-        with column:
-            st.markdown(
-                f"""
-                <div class="landing-card">
-                    <div class="landing-card-icon">{icon}</div>
-                    <strong>{title}</strong>
-                    <span>{description}</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("<div style='height: 18px'></div>", unsafe_allow_html=True)
-    if st.button("🚀 Start asking about government schemes", type="primary", use_container_width=True):
-        st.session_state.show_chat = True
-        st.rerun()
-
-    st.caption("Answers are generated from approved scheme documents. Always verify details with the official source.")
-    st.stop()
 
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -636,44 +494,12 @@ if SOURCE_DATA_DIR.exists() and not any(DATA_DIR.iterdir()):
         if source_file.is_file():
             shutil.copy2(source_file, DATA_DIR / source_file.name)
 
-if "official_documents_checked" not in st.session_state:
-    st.session_state.official_documents_checked = True
-    for document_url in OFFICIAL_DOCUMENTS.values():
-        try:
-            filename, content, final_url = download_official_pdf(document_url)
-            target_path = DATA_DIR / filename
-            if not target_path.exists():
-                target_path.write_bytes(content)
-                SOURCE_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-                registry = {}
-                if SOURCE_REGISTRY_PATH.exists():
-                    registry = json.loads(
-                        SOURCE_REGISTRY_PATH.read_text(encoding="utf-8")
-                    )
-                registry[filename] = final_url
-                SOURCE_REGISTRY_PATH.write_text(
-                    json.dumps(registry, indent=2),
-                    encoding="utf-8",
-                )
-        except Exception:
-            # Bundled official documents remain available if a government
-            # website is temporarily unavailable.
-            pass
-
 VECTORSTORE_DIR.parent.mkdir(parents=True, exist_ok=True)
 if SOURCE_VECTORSTORE_DIR.exists() and not VECTORSTORE_DIR.exists():
     shutil.copytree(SOURCE_VECTORSTORE_DIR, VECTORSTORE_DIR)
 
-if not VECTORSTORE_DIR.exists() or not any(VECTORSTORE_DIR.iterdir()):
-    try:
-        with st.spinner("Indexing official government documents..."):
-            build_vectorstore(chunk_documents(load_all_documents()))
-            reset_runtime_cache()
-    except Exception:
-        pass
 
-
-if REMOTE_DOCUMENT_SYNC and "supabase_sync_done" not in st.session_state:
+if "supabase_sync_done" not in st.session_state:
     st.session_state.supabase_sync_done = True
     if supabase_is_configured():
         try:
@@ -682,14 +508,12 @@ if REMOTE_DOCUMENT_SYNC and "supabase_sync_done" not in st.session_state:
                 if remote_documents_changed or not VECTORSTORE_DIR.exists():
                     build_vectorstore(chunk_documents(load_all_documents()))
                     reset_runtime_cache()
-        except Exception:
-            # Local bundled documents remain available when optional remote
-            # storage is unavailable.
-            pass
+        except Exception as error:
+            st.warning(f"Persistent document storage is unavailable: {error}")
 
 
 # ============================================================
-# CHAT PAGE HEADER
+# PAGE HEADER
 # ============================================================
 
 st.markdown(
@@ -732,56 +556,6 @@ st.caption(
 # ============================================================
 
 with st.sidebar:
-    st.markdown("## Smart FAQ Bot")
-    st.caption("Ask a question and get a clear answer from approved scheme documents.")
-
-    if st.button("← Back to landing page", key="clean_back_to_landing", use_container_width=True):
-        st.session_state.show_chat = False
-        st.rerun()
-
-    st.divider()
-    st.subheader("💡 Recommended questions")
-    recommended_questions = [
-        "How to apply for PM-Kisan?",
-        "Documents needed for Ayushman Bharat?",
-        "Who is eligible for government schemes?",
-    ]
-    for index, question in enumerate(recommended_questions):
-        if st.button(
-            question,
-            key=f"clean_recommended_question_{index}",
-            use_container_width=True,
-        ):
-            st.session_state.pending_question = question
-            st.rerun()
-
-    st.divider()
-    st.subheader("🕘 Recent questions")
-    recent_queries = get_recent_queries(limit=5)
-    if recent_queries:
-        for item in recent_queries:
-            question = item["question"]
-            display_question = question if len(question) <= 40 else question[:37] + "..."
-            if st.button(
-                f"💬 {display_question}",
-                key=f"clean_history_question_{item['id']}",
-                use_container_width=True,
-            ):
-                st.session_state.pending_question = question
-                st.rerun()
-    else:
-        st.caption("Your recent questions will appear here.")
-
-    st.divider()
-    if st.button("🗑️ Clear current chat", key="clean_clear_chat", use_container_width=True):
-        st.session_state.messages = []
-        st.session_state.pending_question = None
-        st.rerun()
-
-
-if False:
-    with st.sidebar:
-        pass
 
     # ========================================================
     # ADD OFFICIAL SCHEME DOCUMENTS
@@ -866,10 +640,6 @@ if False:
     )
 
     st.divider()
-
-    if st.button("← Back to landing page", use_container_width=True):
-        st.session_state.show_chat = False
-        st.rerun()
 
     # ========================================================
     # SCHEMES COVERED
@@ -1473,10 +1243,30 @@ if question:
         # SOURCE
         # ====================================================
 
-        if sources:
+        if is_from_web:
+
+            st.warning(
+                "🌐 This answer came from a "
+                "web source, not an approved "
+                "document."
+            )
+
+
+        elif sources:
+
+            has_official_source = any(
+                "https://" in source
+                for source in sources
+            )
+
+            source_label = (
+                "✅ Official source recorded"
+                if has_official_source
+                else "⚠️ Source URL not recorded"
+            )
 
             st.markdown(
-               f'<span class="gov-badge gov-badge-verified">✅ Approved document: '
+               f'<span class="gov-badge gov-badge-verified">{source_label}: '
                f'{", ".join(sources)}</span>',
         unsafe_allow_html=True,
     )

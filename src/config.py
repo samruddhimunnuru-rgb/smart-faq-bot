@@ -15,7 +15,6 @@ import os
 import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
-from urllib.parse import urlsplit
 
 # ENVIRONMENT
 
@@ -76,13 +75,35 @@ SUPPORTED_LANGUAGES = {
 
 EMBEDDING_MODEL_NAME = os.getenv(
     "EMBEDDING_MODEL",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L3-v2"
+    "sentence-transformers/all-MiniLM-L6-v2"
 )
 
 # RETRIEVAL
 
 TOP_K = int(
     os.getenv("TOP_K", "4")
+)
+
+# LLM
+
+LLM_PROVIDER = os.getenv(
+    "LLM_PROVIDER",
+    "ollama",
+).lower()
+
+LLM_API_KEY = os.getenv(
+    "LLM_API_KEY",
+    os.getenv("OPENAI_API_KEY", ""),
+)
+
+LLM_BASE_URL = os.getenv(
+    "LLM_BASE_URL",
+    os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+)
+
+LLM_MODEL = os.getenv(
+    "LLM_MODEL",
+    os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
 )
 
 # OLLAMA
@@ -92,17 +113,10 @@ OLLAMA_MODEL = os.getenv(
     "llama3.2:3b"
 )
 
-_ollama_base_url = os.getenv(
+OLLAMA_BASE_URL = os.getenv(
     "OLLAMA_BASE_URL",
-    "http://localhost:11434",
-).strip().rstrip("/")
-if _ollama_base_url and not urlsplit(_ollama_base_url).scheme:
-    _ollama_base_url = f"https://{_ollama_base_url}"
-OLLAMA_BASE_URL = _ollama_base_url
-
-# PUBLIC DEPLOYMENT / CLOUD MODE
-# If a hosted Ollama endpoint is supplied, this app will use it automatically.
-# Example: OLLAMA_BASE_URL=https://your-ollama-service.example.com
+    "http://localhost:11434"
+)
 
 
 # SYSTEM PROMPT
@@ -165,19 +179,6 @@ Follow these rules STRICTLY:
 
 15. If the context contains conflicting or unclear
     information, do not guess.
-
-16. Never write a paragraph. Format every answer as short
-    bullet points or numbered steps.
-
-17. Do not mention page numbers, chunk numbers, or internal
-    document metadata in the answer.
-
-18. For application questions, prefer this structure:
-    - Eligibility
-    - Required documents
-    - Steps to apply
-    - Important notes
-    Include only sections supported by the context.
 
 SUPPORTED QUESTION LANGUAGES:
 
