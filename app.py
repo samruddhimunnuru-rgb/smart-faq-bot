@@ -499,6 +499,15 @@ if SOURCE_VECTORSTORE_DIR.exists() and not VECTORSTORE_DIR.exists():
     shutil.copytree(SOURCE_VECTORSTORE_DIR, VECTORSTORE_DIR)
 
 
+if not VECTORSTORE_DIR.exists() or not any(VECTORSTORE_DIR.iterdir()):
+    try:
+        with st.spinner("Preparing scheme documents..."):
+            build_vectorstore(chunk_documents(load_all_documents()))
+            reset_runtime_cache()
+    except Exception as error:
+        st.warning(f"Document search is unavailable: {error}")
+
+
 if "supabase_sync_done" not in st.session_state:
     st.session_state.supabase_sync_done = True
     if supabase_is_configured():

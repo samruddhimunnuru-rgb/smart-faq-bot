@@ -159,16 +159,19 @@ For a container host such as Render, add a Docker service that runs
 python -m streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
 ```
 
-Before deploying, set these Render environment variables:
+For Streamlit Community Cloud, add these values under **App settings > Secrets**:
 
-```text
-OLLAMA_BASE_URL=https://your-reachable-ollama-server.example.com
-OLLAMA_MODEL=llama3.2:3b
+```toml
+LLM_PROVIDER = "openai"
+LLM_API_KEY = "your-hosted-provider-key"
+LLM_BASE_URL = "https://api.openai.com/v1"
+LLM_MODEL = "gpt-4o-mini"
 ```
 
-`OLLAMA_BASE_URL` must point to an internet-reachable Ollama server. The default
-`http://localhost:11434` only works when Ollama is running on the same machine
-as the app, so it cannot be used by a public cloud deployment.
+The app supports any OpenAI-compatible hosted provider, including Groq and
+OpenRouter. Never use `http://localhost:11434` in a cloud deployment because
+it points to the cloud container, not your computer. Ollama remains available
+for local runs by leaving `LLM_PROVIDER` unset or setting it to `ollama`.
 
 ### 8. Persistent document storage with Supabase
 
@@ -190,17 +193,6 @@ SUPABASE_URL = "https://your-project.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key"
 SUPABASE_BUCKET = "scheme-documents"
 ```
-
-Also add the model endpoint required for answers:
-
-```toml
-OLLAMA_BASE_URL = "https://your-public-ollama-server.example.com"
-OLLAMA_MODEL = "llama3.2:3b"
-```
-
-Do not use `http://localhost:11434` in Streamlit Cloud. That address points to
-the cloud container itself, not the computer running Ollama. The server must be
-reachable from the internet and must already have the selected model downloaded.
 
 Use the service-role key only in Streamlit Cloud Secrets. Never commit it to
 GitHub or put it in a public `.env` file. The app stores only PDFs accepted from
